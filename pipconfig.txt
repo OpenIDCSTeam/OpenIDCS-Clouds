@@ -1,2 +1,8 @@
 netifaces
 cx-Freeze
+setuptools
+requests
+GPUtil
+psutil
+py-cpuinfo
+urllib3
