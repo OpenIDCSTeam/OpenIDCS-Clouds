@@ -1,4 +1,5 @@
 import netifaces as ni
+from loguru import logger
 from NICManager.NCConfig import NCConfig
 
 
@@ -77,11 +78,12 @@ class NCManage:
                 # 将网卡配置添加到字典中
                 self.nic_list[nic_key] = nic_config
                 processed_interfaces.add(nic_key)
-                print(
-                    f"Interface {nic_data}: MAC={mac}, IPv4={ip4_addr}, IPv6={ip6_addr}, IPv4_GW={ip4_gate}, IPv6_GW={ip6_gate}")
+                logger.info(
+                    "Interface {}: MAC={}, IPv4={}, IPv6={}, IPv4_GW={}, IPv6_GW={}", 
+                    nic_data, mac, ip4_addr, ip6_addr, ip4_gate, ip6_gate)
 
             except (KeyError, IndexError) as e:
-                print(f"Error getting info for interface {nic_data}: {e}")
+                logger.error("Error getting info for interface {}: {}", nic_data, e)
                 processed_interfaces.add(nic_key)
                 continue
 

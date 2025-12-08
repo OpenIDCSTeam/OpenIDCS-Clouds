@@ -1,5 +1,5 @@
 import json
-from VMUploader.VMPowers import VMPowers as VPower
+from .VMPowers import VMPowers as VPower
 
 
 class HWStatus:
@@ -28,6 +28,9 @@ class HWStatus:
         self.network_d: int = 0  # 当前下行带宽
         self.cpu_heats: int = 0  # 当前核心温度
         self.cpu_power: int = 0  # 当前核心功耗
+        # 虚拟机信息 ============================
+        self.vm_name: str = ""  # 虚拟机名称
+        self.vm_pass: str = ""  # 虚拟机密码
         # 加载传入的参数 ======================
         if config is not None:
             self.__read__(config)
@@ -70,6 +73,8 @@ class HWStatus:
             "network_d": self.network_d,
             "cpu_heats": self.cpu_heats,
             "cpu_power": self.cpu_power,
+            "vm_name": self.vm_name,
+            "vm_pass": self.vm_pass,
         }
 
     # 转换为文本 ==============================
