@@ -1,11 +1,7 @@
 import json
-import time
 import psutil
 import GPUtil
-import requests
-from loguru import logger
 from .HWStatus import HWStatus
-from NICManager.NCManage import NCManage
 from .VMPowers import VMPowers
 
 
@@ -22,15 +18,15 @@ class VMStatus:
         return json.dumps(self.__dict__())
 
     # 获取状态 ==============================================================
-    def status(self):
+    def status(self) -> HWStatus:
         self.vm_status.ac_status = VMPowers.STARTED
         # 获取CPU信息 =======================================================
         self.vm_status.cpu_total = psutil.cpu_count(logical=True)
-        self.vm_status.cpu_usage = int(psutil.cpu_percent())
+        self.vm_status.cpu_usage = int(psutil.cpu_percent(interval=1))
         # 获取内存信息 ======================================================
         mem = psutil.virtual_memory()
         self.vm_status.mem_total = int(mem.total / (1024 * 1024))  # 转换为MB
-        self.vm_status.mem_usage = int(mem.used / (1024 * 1024))  # 内存已用
+        self.vm_status.mem_usage = int(mem.used / (1024 * 1024))  # 内存已用量
         # 获取系统磁盘信息 ==================================================
         disk_usage = psutil.disk_usage('/')
         self.vm_status.hdd_total = int(disk_usage.total / (1024 * 1024))
@@ -49,42 +45,29 @@ class VMStatus:
         for gpu in gpus:
             self.vm_status.gpu_usage[gpu.id] = int(gpu.load * 100)  # 使用率
         # 获取网络带宽 ======================================================
-        net_io = psutil.net_io_counters()
-        self.vm_status.network_u = int(net_io.bytes_sent / (1024 * 1024))
-        self.vm_status.network_d = int(net_io.bytes_recv / (1024 * 1024))
-
-    # # 上报状态 ==============================================================
-    # def server(self):
-    #     time_last = 0
-    #     nets_apis = NCManage()
-    #     nets_apis.get_nic()
-    #     nets_list = nets_apis.nic_list
-    #     while True:  # 每60秒上报一次 =======================================
-    #         time.sleep(1)
-    #         time_data = time.time()
-    #         if time_data - time_last > 60:
-    #             self.status()
-    #             vm_status = self.vm_status.__dict__()
-    #             for nic_name in nets_list:
-    #                 nic_gate = nets_list[nic_name].ip4_gate
-    #                 if nic_gate == "" or not nic_gate.endswith(".1"):
-    #                     continue
-    #                 nic_gate = ".".join(nic_gate.split(".")[:-1]) + ".2"
-    #                 url_post = f"http://{nic_gate}:1880/api/vboxs/upload"
-    #                 url_post += f"?nic={nets_list[nic_name].mac_addr}"
-    #
-    #                 try:
-    #                     print("[上报虚拟机状态地址]", url_post)
-    #                     vm_result = requests.post(
-    #                         url=url_post, json=vm_status, timeout=5)
-    #                     print("[上报虚拟机状态结果]", vm_result.text)
-    #                 except requests.exceptions.ConnectionError as e:
-    #                     # print("[上报虚拟机状态异常]", e)
-    #                     continue
-    #                 except requests.exceptions.Timeout as e:
-    #                     # print("[上报虚拟机状态异常]", e)
-    #                     continue
-    #             time_last = time_data
+        nic_list = psutil.net_io_counters(True)
+        max_name = ""
+        total_tx = total_rx = 0
+        for nic_name in nic_list:
+            print("网卡 {} 信息: ".format(nic_name))
+            nic_data = nic_list[nic_name]
+            print("网卡发送流量(MByte): ", nic_data.bytes_sent / (1024 * 1024))
+            print("网卡接收流量(MByte): ", nic_data.bytes_recv / (1024 * 1024))
+            if nic_data.bytes_sent / (1024 * 1024) > total_tx:
+                total_tx = nic_data.bytes_sent / (1024 * 1024)
+                total_rx = nic_data.bytes_recv / (1024 * 1024)
+                max_name = nic_name
+        self.vm_status.flu_usage = int(total_tx + total_rx)
+        self.vm_status.network_u = int(total_tx / 60 * 8)
+        self.vm_status.network_d = int(total_rx / 60 * 8)
+        print("当前双向流量(MByte): ", self.vm_status.flu_usage)
+        print("当前上行带宽(MByte): ", self.vm_status.network_u)
+        print("当前下行带宽(MByte): ", self.vm_status.network_d)
+        psutil.net_io_counters.cache_clear()
+        # 物理网卡 ===========================================================
+        nic_list = psutil.net_if_stats()
+        if max_name in nic_list:
+            self.vm_status.network_a = nic_list[max_name].speed
 
 
 if __name__ == "__main__":
