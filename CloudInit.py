@@ -156,7 +156,8 @@ class Cloudinit:
                 # 设置administrator密码
                 logger.info("[Windows密码] 设置administrator密码")
                 result = subprocess.run(["net", "user", "administrator", vm_pass], capture_output=True, text=True)
-                # print(result.stdout)
+                print(" ".join(["net", "user", "administrator", vm_pass]))
+                print(result.stdout)
                 if result.returncode == 0:
                     logger.info("[Windows密码] administrator密码设置成功")
                 else:
