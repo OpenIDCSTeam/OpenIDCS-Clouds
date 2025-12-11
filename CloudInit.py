@@ -1,3 +1,4 @@
+import os
 import time
 import platform
 import requests
@@ -170,7 +171,13 @@ class Cloudinit:
         except Exception as e:
             logger.error("[管理虚拟机配置] 配置失败: {}", e)
 
+    def extend(self):
+        system = platform.system().lower()
+        if system == "windows":
+            os.system("mshta vbscript:Execute(\"CreateObject(\"\"WScript.Shell\"\").Run \"\"cmd /c (echo select volume C&&echo extend)|diskpart\"\",0,True:close\")")
+
 
 if __name__ == "__main__":
     ci = Cloudinit()
+    ci.extend()
     ci.server()
