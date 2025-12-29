@@ -54,9 +54,9 @@ class VMStatus:
             print("网卡发送流量(MByte): ", nic_data.bytes_sent / (1024 * 1024))
             print("网卡接收流量(MByte): ", nic_data.bytes_recv / (1024 * 1024))
             if nic_data.bytes_sent / (1024 * 1024) > total_tx:
-                total_tx = nic_data.bytes_sent / (1024 * 1024)
-                total_rx = nic_data.bytes_recv / (1024 * 1024)
-                max_name = nic_name
+                total_rx = nic_data.bytes_sent / (1024 * 1024)
+                total_tx = nic_data.bytes_recv / (1024 * 1024)
+            max_name = nic_name
         self.vm_status.flu_usage = int(total_tx + total_rx)
         self.vm_status.network_u = int(total_tx / 60 * 8)
         self.vm_status.network_d = int(total_rx / 60 * 8)
