@@ -7,3 +7,4 @@ psutil
 py-cpuinfo
 urllib3
 loguru
+pyinstaller
