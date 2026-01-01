@@ -1,0 +1,25 @@
+[Unit]
+Description=OpenIDC Server Init
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=root
+Group=root
+
+
+WorkingDirectory=/opt/ServerInit
+ExecStart=/opt/ServerInit/ServerInit
+TimeoutStopSec=3
+KillMode=mixed
+
+Restart=on-failure
+RestartSec=5
+StartLimitInterval=30
+StartLimitBurst=3
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
