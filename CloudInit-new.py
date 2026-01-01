@@ -120,25 +120,9 @@ class Cloudinit:
                         subprocess.run(["sudo", "hostname", vm_uuid], check=True)
                         logger.info("[Linux主机名] 传统方式设置成功: {}", vm_uuid)
 
-                # 设置root密码
-                logger.info("[Linux密码] 设置root密码")
-                process = subprocess.Popen(["sudo", "chpasswd"], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                           stderr=subprocess.PIPE, text=True)
-                stdout, stderr = process.communicate(input=f"root:{vm_pass}")
-                if process.returncode == 0:
-                    logger.info("[Linux密码] root密码设置成功")
-                else:
-                    logger.error("[Linux密码] 设置失败: {}", stderr)
-
-                # 设置user密码（与root相同）
-                logger.info("[Linux密码] 设置user密码")
-                process = subprocess.Popen(["sudo", "chpasswd"], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                           stderr=subprocess.PIPE, text=True)
-                stdout, stderr = process.communicate(input=f"user:{vm_pass}")
-                if process.returncode == 0:
-                    logger.info("[Linux密码] user密码设置成功")
-                else:
-                    logger.error("[Linux密码] user设置失败: {}", stderr)
+                # 写入 cloudinit 配置
+                logger.info("[Linux密码] 写入 cloudinit 配置")
+                self._write_cloudinit_config(vm_uuid, vm_pass)
 
                 logger.info("[Linux配置] Linux系统配置完成")
 
@@ -174,12 +158,86 @@ class Cloudinit:
                 else:
                     logger.error("[Windows密码] 设置失败: {}", result.stderr)
 
+                # 写入 cloudinit-base 配置
+                logger.info("[Windows配置] 写入 cloudinit-base 配置")
+                self._write_cloudinit_base_windows(vm_uuid, vm_pass)
+
                 logger.info("[Windows配置] Windows系统配置完成")
             else:
                 logger.warning("[管理虚拟机配置] 不支持的操作系统: {}", system)
 
         except Exception as e:
             logger.error("[管理虚拟机配置] 配置失败: {}", e)
+
+    def _write_cloudinit_config(self, hostname, password):
+        """写入 cloud-init 配置文件"""
+        try:
+            # 写入 Linux /etc/cloud/cloudinit 文件
+            cloudinit_content = f"""# cloudinit configuration
+hostname: {hostname}
+password: {password}
+"""
+            with open("/etc/cloud/cloudinit", "w") as f:
+                f.write(cloudinit_content)
+            logger.info("[cloudinit] 配置写入成功: /etc/cloud/cloudinit")
+
+            # 设置 Linux 主机名
+            current_hostname_result = subprocess.run(["hostname"], capture_output=True, text=True)
+            current_hostname = current_hostname_result.stdout.strip()
+            if current_hostname != hostname:
+                logger.info("[Linux主机名] 设置主机名为: {}", hostname)
+                result = subprocess.run(["sudo", "hostnamectl", "set-hostname", hostname], capture_output=True, text=True)
+                if result.returncode == 0:
+                    logger.info("[Linux主机名] 主机名设置成功: {}", hostname)
+                else:
+                    with open("/etc/hostname", "w") as f:
+                        f.write(hostname + "\n")
+                    subprocess.run(["sudo", "hostname", hostname], check=True)
+                    logger.info("[Linux主机名] 传统方式设置成功: {}", hostname)
+            else:
+                logger.info("[Linux主机名] 当前主机名已经是: {}，无需修改", hostname)
+
+        except IOError as e:
+            logger.error("[cloudinit] 写入配置文件失败: {}", e)
+        except Exception as e:
+            logger.error("[cloudinit] 配置写入异常: {}", e)
+
+    def _write_cloudinit_base_windows(self, hostname, password):
+        """写入 Windows cloudinit-base 配置文件"""
+        try:
+            # 写入 Windows C:\cloud\cloudinit-base.ini 文件
+            cloudinit_base_content = f"""[Configuration]
+hostname={hostname}
+password={password}
+
+[Users]
+root={password}
+user={password}
+"""
+            config_path = r"C:\cloud\cloudinit-base.ini"
+            with open(config_path, "w") as f:
+                f.write(cloudinit_base_content)
+            logger.info("[cloudinit] 配置写入成功: {}", config_path)
+
+            # 设置 Windows 主机名
+            current_hostname_result = subprocess.run(["hostname"], capture_output=True, text=True, shell=True)
+            current_hostname = current_hostname_result.stdout.strip()
+            if current_hostname.lower() != hostname.lower():
+                logger.info("[Windows主机名] 设置主机名为: {}", hostname)
+                result = subprocess.run(
+                    ["wmic", "computersystem", "where", "name='%computername%'", "rename", hostname],
+                    capture_output=True, text=True, shell=True)
+                if result.returncode == 0:
+                    logger.info("[Windows主机名] 主机名设置成功，需要重启后生效: {}", hostname)
+                else:
+                    logger.error("[Windows主机名] 设置失败: {}", result.stderr)
+            else:
+                logger.info("[Windows主机名] 当前主机名已经是: {}，无需修改", hostname)
+
+        except IOError as e:
+            logger.error("[cloudinit] 写入配置文件失败: {}", e)
+        except Exception as e:
+            logger.error("[cloudinit] 配置写入异常: {}", e)
 
     def extend(self):
         system = platform.system().lower()
