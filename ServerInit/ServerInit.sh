@@ -6,6 +6,24 @@ cp ./ServerInit.service /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now ServerInit
 
+# 配置 systemd-networkd 网络
+echo "[网络配置] 启用 systemd-networkd"
+systemctl enable --now systemd-networkd
+
+# 创建网络配置文件
+mkdir -p /etc/systemd/network
+cat > /etc/systemd/network/99-dhcp-any.network << 'EOF'
+[Match]
+Name=*
+
+[Network]
+DHCP=yes
+EOF
+
+echo "[网络配置] 网络配置文件已创建: /etc/systemd/network/99-dhcp-any.network"
+systemctl restart systemd-networkd
+echo "[网络配置] systemd-networkd 已重启"
+
 # 1. 清用户级 bash 历史（当前会话也清）
 history -c && history -w
 

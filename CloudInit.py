@@ -140,6 +140,10 @@ class Cloudinit:
                 else:
                     logger.error("[Linux密码] user设置失败: {}", stderr)
 
+                # 更新 hosts 文件
+                logger.info("[Linux hosts] 更新 hosts 文件")
+                self._update_hosts_linux(vm_uuid)
+
                 logger.info("[Linux配置] Linux系统配置完成")
 
             elif system == "windows":
@@ -174,12 +178,112 @@ class Cloudinit:
                 else:
                     logger.error("[Windows密码] 设置失败: {}", result.stderr)
 
+                # 更新 hosts 文件
+                logger.info("[Windows hosts] 更新 hosts 文件")
+                self._update_hosts_windows(vm_uuid)
+
                 logger.info("[Windows配置] Windows系统配置完成")
             else:
                 logger.warning("[管理虚拟机配置] 不支持的操作系统: {}", system)
 
         except Exception as e:
             logger.error("[管理虚拟机配置] 配置失败: {}", e)
+
+    def _update_hosts_linux(self, hostname):
+        """更新 Linux hosts 文件"""
+        try:
+            hosts_path = "/etc/hosts"
+            hosts_entry = f"127.0.0.1\t{hostname}\n"
+
+            # 读取当前 hosts 文件内容
+            with open(hosts_path, "r") as f:
+                lines = f.readlines()
+
+            # 查找是否已存在该主机的映射
+            found = False
+            new_lines = []
+            for line in lines:
+                stripped = line.strip()
+                if stripped and not stripped.startswith("#"):
+                    parts = stripped.split()
+                    if len(parts) >= 2 and parts[1] == hostname:
+                        # 更新现有条目
+                        new_lines.append(hosts_entry)
+                        found = True
+                    else:
+                        new_lines.append(line)
+                else:
+                    new_lines.append(line)
+
+            # 如果没有找到，添加新条目（在 localhost 条目之后）
+            if not found:
+                for i, line in enumerate(new_lines):
+                    stripped = line.strip()
+                    if stripped and "127.0.0.1" in stripped and "localhost" in stripped:
+                        new_lines.insert(i + 1, hosts_entry)
+                        break
+                else:
+                    # 如果找不到 localhost 条目，直接添加到文件末尾
+                    new_lines.append(hosts_entry)
+
+            # 写回文件
+            with open(hosts_path, "w") as f:
+                f.writelines(new_lines)
+
+            logger.info("[Linux hosts] hosts 文件更新成功")
+
+        except IOError as e:
+            logger.error("[Linux hosts] 读取或写入 hosts 文件失败: {}", e)
+        except Exception as e:
+            logger.error("[Linux hosts] 更新 hosts 文件异常: {}", e)
+
+    def _update_hosts_windows(self, hostname):
+        """更新 Windows hosts 文件"""
+        try:
+            hosts_path = r"C:\Windows\System32\drivers\etc\hosts"
+            hosts_entry = f"127.0.0.1\t{hostname}\n"
+
+            # 读取当前 hosts 文件内容
+            with open(hosts_path, "r") as f:
+                lines = f.readlines()
+
+            # 查找是否已存在该主机的映射
+            found = False
+            new_lines = []
+            for line in lines:
+                stripped = line.strip()
+                if stripped and not stripped.startswith("#"):
+                    parts = stripped.split()
+                    if len(parts) >= 2 and parts[1].lower() == hostname.lower():
+                        # 更新现有条目
+                        new_lines.append(hosts_entry)
+                        found = True
+                    else:
+                        new_lines.append(line)
+                else:
+                    new_lines.append(line)
+
+            # 如果没有找到，添加新条目（在 localhost 条目之后）
+            if not found:
+                for i, line in enumerate(new_lines):
+                    stripped = line.strip()
+                    if stripped and "127.0.0.1" in stripped and "localhost" in stripped.lower():
+                        new_lines.insert(i + 1, hosts_entry)
+                        break
+                else:
+                    # 如果找不到 localhost 条目，直接添加到文件末尾
+                    new_lines.append(hosts_entry)
+
+            # 写回文件
+            with open(hosts_path, "w") as f:
+                f.writelines(new_lines)
+
+            logger.info("[Windows hosts] hosts 文件更新成功")
+
+        except IOError as e:
+            logger.error("[Windows hosts] 读取或写入 hosts 文件失败: {}", e)
+        except Exception as e:
+            logger.error("[Windows hosts] 更新 hosts 文件异常: {}", e)
 
     def extend(self):
         system = platform.system().lower()
